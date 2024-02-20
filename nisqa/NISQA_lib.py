@@ -253,7 +253,6 @@ class NISQA_DIM(nn.Module):
         return nn.ModuleList([copy.deepcopy(module) for i in range(N)])
 
     def forward(self, x, n_wins):
-
         x = self.cnn(x, n_wins)
         x, n_wins = self.time_dependency(x, n_wins)
         x, n_wins = self.time_dependency_2(x, n_wins)
@@ -315,7 +314,6 @@ class NISQA_DE(nn.Module):
         de_fuse_dim=None,
         de_fuse=True,
     ):
-
         super().__init__()
 
         self.name = "NISQA_DE"
@@ -394,7 +392,6 @@ class NISQA_DE(nn.Module):
         return x, y, n_wins_x, n_wins_y
 
     def forward(self, x, n_wins):
-
         x, y, n_wins_x, n_wins_y = self._split_ref_deg(x, n_wins)
 
         x = self.cnn(x, n_wins_x)
@@ -566,7 +563,6 @@ class DFF(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x):
-
         x = self.bn1(x)
         x = x.view(-1, self.fan_in)
 
@@ -686,7 +682,6 @@ class AdaptCNN(nn.Module):
             self.fan_out = self.conv6.out_channels * self.pool_3[0]
 
     def forward(self, x):
-
         x = F.relu(self.bn1(self.conv1(x)))
         x = F.adaptive_max_pool2d(x, output_size=(self.pool_1))
 
@@ -799,7 +794,6 @@ class StandardCNN(nn.Module):
             )
 
     def forward(self, x):
-
         x = F.relu(self.bn1(self.conv1(x)))
         x = self.pool_first(x)
 
@@ -914,7 +908,6 @@ class LSTM(nn.Module):
         self.fan_out = num_directions * lstm_h
 
     def forward(self, x, n_wins):
-
         x = pack_padded_sequence(
             x, n_wins.cpu(), batch_first=True, enforce_sorted=False
         )
@@ -1018,7 +1011,6 @@ class SelfAttentionLayer(nn.Module):
             return F.gelu
 
     def forward(self, src, n_wins=None):
-
         if n_wins is not None:
             mask = ~(
                 (torch.arange(src.shape[0])[None, :]).to(src.device)
@@ -1154,7 +1146,6 @@ class PoolAtt(torch.nn.Module):
         self.linear2 = nn.Linear(d_input, output_size)
 
     def forward(self, x, n_wins):
-
         att = self.linear1(x)
 
         att = att.transpose(2, 1)
@@ -1188,7 +1179,6 @@ class PoolAttFF(torch.nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, n_wins):
-
         att = self.linear2(self.dropout(self.activation(self.linear1(x))))
         att = att.transpose(2, 1)
         mask = torch.arange(att.shape[2])[None, :] < n_wins[:, None].to("cpu").to(
@@ -1215,7 +1205,6 @@ class PoolAvg(torch.nn.Module):
         self.linear = nn.Linear(d_input, output_size)
 
     def forward(self, x, n_wins):
-
         mask = torch.arange(x.shape[1])[None, :] < n_wins[:, None].to("cpu").to(
             torch.long
         )
@@ -1240,7 +1229,6 @@ class PoolMax(torch.nn.Module):
         self.linear = nn.Linear(d_input, output_size)
 
     def forward(self, x, n_wins):
-
         mask = torch.arange(x.shape[1])[None, :] < n_wins[:, None].to("cpu").to(
             torch.long
         )
@@ -1454,7 +1442,6 @@ class Fusion(torch.nn.Module):
             self.fan_out = fuse_dim
 
     def forward(self, x, y):
-
         if self.fuse == "x/y/-":
             x = torch.cat((x, y, x - y), 2)
         elif self.fuse == "+/-":
@@ -1498,7 +1485,7 @@ def predict_mos(model, ds, bs, dev, num_workers=0):
     return y_hat, y
 
 
-def predict_dim(model, ds, bs, dev, num_workers=0):
+def predict_dim(model, ds, bs, dev, num_workers=0, progress_bar=False):
     """
     predict_dim: predicts MOS and dimensions of the given dataset with given
     model. Used for NISQA_DIM model.
@@ -1516,7 +1503,7 @@ def predict_dim(model, ds, bs, dev, num_workers=0):
     with torch.no_grad():
         y_hat_list = [
             [model(xb.to(dev), n_wins.to(dev)).cpu().numpy(), yb.cpu().numpy()]
-            for xb, yb, (idx, n_wins) in dl
+            for xb, yb, (idx, n_wins) in tqdm(dl, disable=not progress_bar)
         ]
     yy = np.concatenate(y_hat_list, axis=1)
 
@@ -1776,7 +1763,6 @@ def eval_results(
     df["y_hat_map"] = np.nan
 
     for db_name in df.db.astype("category").cat.categories:
-
         df_db = df.loc[df.db == db_name]
         if dcon is not None:
             dcon_db = dcon.loc[dcon.db == db_name]
@@ -1822,12 +1808,10 @@ def eval_results(
         }
 
         if (dcon_db is not None) and ("con" in df_db):
-
             y_con = dcon_db[target_mos].to_numpy()
             y_con_hat = df_db.groupby("con").mean().get(pred).to_numpy()
 
             if not np.isnan(y_con).any():
-
                 if target_ci in dcon_db:
                     ci_con = dcon_db[target_ci].to_numpy()
                 else:
@@ -1877,7 +1861,6 @@ def eval_results(
             plt.show()
 
             if (dcon_db is not None) and ("con" in df_db):
-
                 xx = np.arange(0, 6, 0.01)
                 yy = calc_mapped(xx, b_con)
 
@@ -1965,7 +1948,6 @@ class biasLoss(object):
         loss_weight=0.0,
         do_print=True,
     ):
-
         self.db = db
         self.mapping = mapping
         self.min_r = min_r
@@ -1982,7 +1964,6 @@ class biasLoss(object):
             self.apply_bias_loss = False
 
     def get_loss(self, yb, yb_hat, idx):
-
         if self.apply_bias_loss:
             b = torch.tensor(self.b, dtype=torch.float).to(yb_hat.device)
             b = b[idx, :]
@@ -2004,7 +1985,6 @@ class biasLoss(object):
         return loss
 
     def update_bias(self, y, y_hat):
-
         if self.apply_bias_loss:
             y_hat = y_hat.reshape(-1)
             y = y.reshape(-1)
@@ -2025,7 +2005,6 @@ class biasLoss(object):
                 if self.do_print:
                     print("--> bias updated")
                 for db_name in self.db.unique():
-
                     db_idx = (self.db == db_name).to_numpy().nonzero()
                     y_hat_db = y_hat[db_idx]
                     y_db = y[db_idx]
@@ -2096,7 +2075,6 @@ class earlyStopper_dim(object):
     """
 
     def __init__(self, patience):
-
         self.best_rmse = 1e10
         self.best_rmse_noi = 1e10
         self.best_rmse_col = 1e10
@@ -2114,7 +2092,6 @@ class earlyStopper_dim(object):
         self.best = False
 
     def step(self, r):
-
         self.best = False
 
         if r["r_p_mean_file"] > self.best_r_p:
@@ -2176,7 +2153,7 @@ class SpeechQualityDataset(Dataset):
 
     def __init__(
         self,
-        df,
+        df: pd.DataFrame,
         df_con=None,
         data_dir="",
         folder_column="",
@@ -2199,7 +2176,6 @@ class SpeechQualityDataset(Dataset):
         filename_column_ref=None,
         dim=False,
     ):
-
         self.df = df
         self.df_con = df_con
         self.data_dir = data_dir
@@ -2253,7 +2229,6 @@ class SpeechQualityDataset(Dataset):
         self.to_memory = True
 
     def _load_spec(self, index):
-
         # Load spec
         file_path = os.path.join(
             self.data_dir, self.df[self.filename_column].iloc[index]

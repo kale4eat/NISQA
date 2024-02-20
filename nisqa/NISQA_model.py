@@ -36,6 +36,8 @@ class nisqaModel(object):
         self.runinfos = {}
         self._getDevice()
         self._loadModel()
+        self.ds_train: NL.SpeechQualityDataset = None
+        self.ds_val: NL.SpeechQualityDataset = None
         self._loadDatasets()
         self.args["now"] = datetime.datetime.today()
 
@@ -55,7 +57,7 @@ class nisqaModel(object):
         else:
             self._evaluate_mos(mapping=mapping, do_print=do_print, do_plot=do_plot)
 
-    def predict(self):
+    def predict(self, progress_bar=False) -> pd.DataFrame:
         print("---> Predicting ...")
         if self.args["tr_parallel"]:
             self.model = nn.DataParallel(self.model)
@@ -67,6 +69,7 @@ class nisqaModel(object):
                 self.args["tr_bs_val"],
                 self.dev,
                 num_workers=self.args["tr_num_workers"],
+                progress_bar=progress_bar,
             )
         else:
             y_val_hat, y_val = NL.predict_mos(
